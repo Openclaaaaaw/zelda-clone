@@ -830,3 +830,119 @@ window.addEventListener('resize', () => {
 })
 
 init()
+
+// ==================== FULL MAP ====================
+function showFullMap() {
+  const existing = document.getElementById('full-map')
+  if (existing) {
+    existing.remove()
+    return
+  }
+  
+  const map = document.createElement('div')
+  map.id = 'full-map'
+  map.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,50,0,0.95);z-index:500;display:flex;align-items:center;justify-content:center;'
+  
+  // Map canvas
+  const canvas = document.createElement('canvas')
+  canvas.width = 600
+  canvas.height = 600
+  canvas.style.cssText = 'border:3px solid #4a7c3f;border-radius:10px;'
+  
+  const ctx = canvas.getContext('2d')
+  
+  // Draw terrain
+  ctx.fillStyle = '#4a7c3f'
+  ctx.fillRect(0, 0, 600, 600)
+  
+  // Draw lakes
+  ctx.fillStyle = '#1e90ff'
+  ctx.beginPath()
+  ctx.arc(150, 350, 40, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.beginPath()
+  ctx.arc(450, 350, 30, 0, Math.PI * 2)
+  ctx.fill()
+  
+  // Draw dungeon
+  ctx.fillStyle = '#444444'
+  ctx.fillRect(80, 80, 30, 30)
+  ctx.fillStyle = '#ffaa00'
+  ctx.beginPath()
+  ctx.arc(95, 70, 10, 0, Math.PI * 2)
+  ctx.fill()
+  
+  // Draw player
+  ctx.fillStyle = '#00ff00'
+  ctx.beginPath()
+  ctx.arc(300 + state.position.x / 2, 300 + state.position.z / 2, 8, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 2
+  ctx.stroke()
+  
+  // Draw enemies
+  ctx.fillStyle = '#ff0000'
+  enemies.forEach(e => {
+    ctx.beginPath()
+    ctx.arc(300 + e.position.x / 2, 300 + e.position.z / 2, 5, 0, Math.PI * 2)
+    ctx.fill()
+  })
+  
+  // Draw horses
+  ctx.fillStyle = '#8B4513'
+  scene.traverse(obj => {
+    if (obj.userData?.type === 'horse') {
+      ctx.beginPath()
+      ctx.arc(300 + obj.position.x / 2, 300 + obj.position.z / 2, 5, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  })
+  
+  // Draw cooking pot
+  ctx.fillStyle = '#333333'
+  ctx.beginPath()
+  ctx.arc(300 + 25 / 2, 300 - 25 / 2, 8, 0, Math.PI * 2)
+  ctx.fill()
+  
+  // Labels
+  ctx.fillStyle = '#ffffff'
+  ctx.font = '12px Arial'
+  ctx.fillText('🏰 Dungeon', 70, 60)
+  ctx.fillText('🍳 Cooking', 280, 270)
+  ctx.fillText('💧 Lake', 130, 320)
+  ctx.fillText('💧 Lake', 430, 320)
+  
+  // Compass
+  ctx.fillStyle = '#ffd700'
+  ctx.font = 'bold 20px Arial'
+  ctx.fillText('N', 290, 20)
+  
+  map.appendChild(canvas)
+  
+  // Close button
+  const close = document.createElement('button')
+  close.textContent = 'Close (M)'
+  close.style.cssText = 'position:absolute;top:20px;right:20px;padding:10px 20px;background:#ff4444;color:white;border:none;border-radius:5px;cursor:pointer;font-size:16px;'
+  close.onclick = () => map.remove()
+  map.appendChild(close)
+  
+  // Instructions
+  const info = document.createElement('div')
+  info.style.cssText = 'position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#aaa;font-size:14px;'
+  info.textContent = '🟢 Player | 🔴 Enemies | 🟤 Horses | 🏰 Dungeon | 🍳 Cooking'
+  map.appendChild(info)
+  
+  document.body.appendChild(map)
+}
+
+// Update controls to add M for map
+const originalSetup = setupControls
+setupControls = function() {
+  originalSetup()
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'm' || e.key === 'M') {
+      showFullMap()
+    }
+  })
+}

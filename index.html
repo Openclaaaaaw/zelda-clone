@@ -29,7 +29,8 @@
     }
     
     /* Minimap */
-    #minimap {
+    #minimap canvas { width: 100%; height: 100%; }
+#minimap {
       position: absolute;
       bottom: 20px;
       right: 20px;
@@ -120,7 +121,7 @@
   <div id="ui">
     <div id="hearts">❤️❤️❤️❤️❤️</div>
     <div id="stamina"><div id="stamina-bar"></div></div>
-    <div id="minimap"></div>
+    <div id="minimap"><canvas id="minimap-canvas" width="150" height="150"></canvas></div>
     <div id="crosshair"></div>
     <div id="controls">
       <h3>🎮 Controls</h3>
