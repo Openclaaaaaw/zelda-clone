@@ -1,12 +1,12 @@
 import * as THREE from 'three'
 
-const CONFIG = { playerSpeed: 5, sprintSpeed: 12, jumpForce: 10, gravity: 30, worldSize: 500 }
+const CONFIG = { playerSpeed: 5, sprintSpeed: 12, jumpForce: 10, gravity: 30, worldSize: 500, horseSpeed: 18 }
 
 const state = {
   health: 5, maxHealth: 5, stamina: 100, rupees: 0, keys: 0,
-  isSprinting: false, isJumping: false,
+  isSprinting: false, isJumping: false, isRiding: false,
   velocity: new THREE.Vector3(), keys: {}, position: new THREE.Vector3(0, 5, 0),
-  weather: 'sunny', isRiding: false
+  weather: 'sunny'
 }
 
 const scene = new THREE.Scene()
@@ -131,7 +131,7 @@ function createDungeon(x, z) {
   scene.add(glow)
 }
 
-let player
+let player, horse = null
 function createPlayer() {
   const group = new THREE.Group()
   
@@ -166,6 +166,72 @@ function createPlayer() {
   group.add(sword)
   
   group.position.copy(state.position)
+  scene.add(group)
+  return group
+}
+
+// ==================== HORSES ====================
+function createHorse(x, z, color = 0x8B4513) {
+  const group = new THREE.Group()
+  
+  // Body
+  const body = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.6, 1.8, 4, 8),
+    new THREE.MeshStandardMaterial({ color })
+  )
+  body.position.y = 1.2
+  body.rotation.x = Math.PI / 2
+  body.castShadow = true
+  group.add(body)
+  
+  // Neck
+  const neck = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.2, 0.3, 1, 8),
+    new THREE.MeshStandardMaterial({ color })
+  )
+  neck.position.set(0, 2, 1)
+  neck.rotation.x = -0.3
+  group.add(neck)
+  
+  // Head
+  const head = new THREE.Mesh(
+    new THREE.BoxGeometry(0.4, 0.5, 0.8),
+    new THREE.MeshStandardMaterial({ color })
+  )
+  head.position.set(0, 2.3, 1.3)
+  group.add(head)
+  
+  // Mane
+  const mane = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.15, 0.15, 1.2, 8),
+    new THREE.MeshStandardMaterial({ color: 0x222222 })
+  )
+  mane.position.set(0, 2.1, 0.7)
+  mane.rotation.x = 0.2
+  group.add(mane)
+  
+  // Legs
+  for (let i = 0; i < 4; i++) {
+    const leg = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.1, 1.2, 8),
+      new THREE.MeshStandardMaterial({ color })
+    )
+    leg.position.set((i % 2 === 0 ? 0.3 : -0.3), 0.6, (i < 2 ? 0.5 : -0.5))
+    leg.name = `leg${i}`
+    group.add(leg)
+  }
+  
+  // Tail
+  const tail = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.1, 0.8, 8),
+    new THREE.MeshStandardMaterial({ color: 0x222222 })
+  )
+  tail.position.set(0, 1.5, -1.2)
+  tail.rotation.x = 0.5
+  group.add(tail)
+  
+  group.position.set(x, 0, z)
+  group.userData = { type: 'horse', speed: CONFIG.horseSpeed, name: 'Horse' }
   scene.add(group)
   return group
 }
@@ -284,6 +350,11 @@ function generateWorld() {
   
   createDungeon(-80, -80)
   
+  // Horses!
+  createHorse(10, 10, 0x8B4513)  // Brown
+  createHorse(15, 15, 0xFFFFFF)   // White
+  createHorse(-10, 20, 0x222222)  // Black
+  
   createGoblin(30, 30)
   createGoblin(-40, 20)
   createGoblin(50, -40)
@@ -297,12 +368,11 @@ function generateWorld() {
   createKey(0, 50)
 }
 
-// ==================== WEATHER SYSTEM ====================
+// ==================== WEATHER ====================
 let weatherParticles = []
 let currentWeather = 'sunny'
 
 function setWeather(type) {
-  // Clear existing
   weatherParticles.forEach(p => scene.remove(p))
   weatherParticles = []
   currentWeather = type
@@ -311,17 +381,12 @@ function setWeather(type) {
     scene.background = new THREE.Color(0x445566)
     scene.fog.color = new THREE.Color(0x445566)
     sunLight.intensity = 0.3
-    
     for (let i = 0; i < 1000; i++) {
       const drop = new THREE.Mesh(
         new THREE.BoxGeometry(0.02, 0.3, 0.02),
         new THREE.MeshBasicMaterial({ color: 0xaaaaff, transparent: true, opacity: 0.6 })
       )
-      drop.position.set(
-        (Math.random() - 0.5) * 200,
-        Math.random() * 60,
-        (Math.random() - 0.5) * 200
-      )
+      drop.position.set((Math.random() - 0.5) * 200, Math.random() * 60, (Math.random() - 0.5) * 200)
       scene.add(drop)
       weatherParticles.push(drop)
     }
@@ -329,17 +394,12 @@ function setWeather(type) {
     scene.background = new THREE.Color(0xaabbcc)
     scene.fog.color = new THREE.Color(0xaabbcc)
     sunLight.intensity = 0.5
-    
     for (let i = 0; i < 500; i++) {
       const flake = new THREE.Mesh(
         new THREE.SphereGeometry(0.1, 8, 8),
         new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 })
       )
-      flake.position.set(
-        (Math.random() - 0.5) * 200,
-        Math.random() * 60,
-        (Math.random() - 0.5) * 200
-      )
+      flake.position.set((Math.random() - 0.5) * 200, Math.random() * 60, (Math.random() - 0.5) * 200)
       scene.add(flake)
       weatherParticles.push(flake)
     }
@@ -351,7 +411,6 @@ function setWeather(type) {
     scene.background = new THREE.Color(0x0a0a2e)
     scene.fog.color = new THREE.Color(0x0a0a2e)
     sunLight.intensity = 0.1
-    ambientLight.intensity = 0.2
   }
 }
 
@@ -380,7 +439,10 @@ function setupControls() {
   window.addEventListener('keydown', (e) => {
     state.keys[e.key.toLowerCase()] = true
     if (e.key === 'Shift') state.isSprinting = true
-    if (e.key === 'e' || e.key === 'E') attack()
+    if (e.key === 'e' || e.key === 'E') {
+      if (state.isRiding) dismountHorse()
+      else tryMountHorse()
+    }
     if (e.key === 't' || e.key === 'T') cycleWeather()
   })
   
@@ -400,6 +462,42 @@ function setupControls() {
   })
 }
 
+// ==================== HORSE RIDING ====================
+function tryMountHorse() {
+  let closestHorse = null
+  let closestDist = 5
+  
+  // Find horses in scene
+  scene.traverse(obj => {
+    if (obj.userData?.type === 'horse') {
+      const dist = player.position.distanceTo(obj.position)
+      if (dist < closestDist) {
+        closestDist = dist
+        closestHorse = obj
+      }
+    }
+  })
+  
+  if (closestHorse) {
+    horse = closestHorse
+    state.isRiding = true
+    player.visible = false
+    showMessage('Mounted Horse! (E to dismount)')
+  }
+}
+
+function dismountHorse() {
+  if (horse) {
+    state.position.copy(horse.position)
+    state.position.y = 1.5
+    state.isRiding = false
+    player.visible = true
+    player.position.copy(state.position)
+    horse = null
+    showMessage('Dismounted')
+  }
+}
+
 // ==================== COMBAT ====================
 let attackCooldown = 0
 
@@ -408,11 +506,12 @@ function attack() {
   attackCooldown = 0.5
   
   enemies.forEach(enemy => {
+    const range = state.isRiding ? 4 : 3
     const dist = player.position.distanceTo(enemy.position)
-    if (dist < 3) {
+    if (dist < range) {
       enemy.userData.health -= 1
       const dir = new THREE.Vector3().subVectors(enemy.position, player.position).normalize()
-      enemy.position.add(dir.multiplyScalar(3))
+      enemy.position.add(dir.multiplyScalar(state.isRiding ? 5 : 3))
       showDamage(enemy.position, '-1')
       
       if (enemy.userData.health <= 0) {
@@ -452,7 +551,7 @@ function update(delta) {
   gameTime += delta
   updateWeather(delta)
   
-  const speed = state.isSprinting ? CONFIG.sprintSpeed : CONFIG.playerSpeed
+  const speed = state.isRiding ? CONFIG.horseSpeed : (state.isSprinting ? CONFIG.sprintSpeed : CONFIG.playerSpeed)
   const direction = new THREE.Vector3()
   
   if (state.keys['w']) direction.z -= 1
@@ -463,34 +562,51 @@ function update(delta) {
   if (direction.length() > 0) {
     direction.normalize()
     direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), camera.rotation.y)
+    
+    if (state.isRiding && horse) {
+      horse.position.x += direction.x * speed * delta
+      horse.position.z += direction.z * speed * delta
+      horse.rotation.y = camera.rotation.y
+      
+      // Animate legs
+      horse.children.forEach((child, i) => {
+        if (child.name?.startsWith('leg')) {
+          child.rotation.x = Math.sin(gameTime * 10) * 0.5
+        }
+      })
+    }
+    
     state.position.x += direction.x * speed * delta
     state.position.z += direction.z * speed * delta
     
-    if (state.isSprinting && state.stamina > 0) {
+    if (!state.isRiding && state.isSprinting && state.stamina > 0) {
       state.stamina = Math.max(0, state.stamina - 20 * delta)
     } else if (!state.isSprinting) {
       state.stamina = Math.min(100, state.stamina + 10 * delta)
     }
   }
   
-  if (state.keys[' '] && !state.isJumping && state.position.y <= 5.1) {
-    state.velocity.y = CONFIG.jumpForce
-    state.isJumping = true
+  if (!state.isRiding) {
+    if (state.keys[' '] && !state.isJumping && state.position.y <= 5.1) {
+      state.velocity.y = CONFIG.jumpForce
+      state.isJumping = true
+    }
+    
+    state.velocity.y -= CONFIG.gravity * delta
+    state.position.y += state.velocity.y * delta
+    
+    if (state.position.y < 5) {
+      state.position.y = 5
+      state.velocity.y = 0
+      state.isJumping = false
+    }
+    
+    player.position.copy(state.position)
+    player.rotation.y = camera.rotation.y
   }
   
-  state.velocity.y -= CONFIG.gravity * delta
-  state.position.y += state.velocity.y * delta
-  
-  if (state.position.y < 5) {
-    state.position.y = 5
-    state.velocity.y = 0
-    state.isJumping = false
-  }
-  
-  player.position.copy(state.position)
-  player.rotation.y = camera.rotation.y
-  camera.position.copy(state.position)
-  camera.position.y += 1.6
+  camera.position.copy(state.isRiding ? horse.position : state.position)
+  camera.position.y += 2.5
   
   items.forEach(item => {
     item.rotation.y += delta
@@ -510,6 +626,7 @@ function update(delta) {
       if (state.health <= 0) {
         state.health = state.maxHealth
         state.position.set(0, 5, 0)
+        if (horse) dismountHorse()
         showMessage('You died!')
       }
     }
@@ -544,7 +661,7 @@ function init() {
   player = createPlayer()
   setupControls()
   document.getElementById('loading').classList.add('hidden')
-  showMessage('Press T to change weather!')
+  showMessage('Find horses! Press E to mount!')
   animate()
 }
 
