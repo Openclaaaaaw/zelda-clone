@@ -530,7 +530,8 @@ function updateUI() {
 
 // ==================== GAME LOOP ====================
 let gameTime = 0
-function update(delta) {
+function updateWeather(delta)
+  update(delta) {
   gameTime += delta
   
   // Movement
@@ -635,6 +636,7 @@ const clock = new THREE.Clock()
 function animate() {
   requestAnimationFrame(animate)
   const delta = Math.min(clock.getDelta(), 0.1)
+  updateWeather(delta)
   update(delta)
   renderer.render(scene, camera)
 }
@@ -655,3 +657,89 @@ window.addEventListener('resize', () => {
 })
 
 init()
+
+// ==================== HORSES ====================
+let horse = null
+
+function createHorse(x, z) {
+  const group = new THREE.Group()
+  
+  // Body
+  const body = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.5, 1.5, 4, 8),
+    new THREE.MeshStandardMaterial({ color: 0x8B4513 })
+  )
+  body.position.y = 1
+  body.rotation.x = Math.PI / 2
+  group.add(body)
+  
+  // Head
+  const head = new THREE.Mesh(
+    new THREE.BoxGeometry(0.4, 0.8, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0x8B4513 })
+  )
+  head.position.set(0, 1.5, 1.2)
+  group.add(head)
+  
+  // Legs (simplified)
+  for (let i = 0; i < 4; i++) {
+    const leg = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.1, 1),
+      new THREE.MeshStandardMaterial({ color: 0x654321 })
+    )
+    leg.position.set((i % 2 - 0.5) * 0.4, 0.5, (i < 2 ? 0.5 : -0.5))
+    group.add(leg)
+  }
+  
+  group.position.set(x, 0, z)
+  group.userData = { type: 'horse', speed: 15, canRide: true }
+  scene.add(group)
+  return group
+}
+
+function rideHorse() {
+  if (horse) {
+    state.position.copy(horse.position)
+    state.position.y = 2
+    showMessage('Riding horse!')
+  }
+}
+
+// ==================== SWIMMING ====================
+function canSwim() {
+  return state.position.y < 2
+}
+
+// ==================== WEATHER ====================
+let weather = 'sunny'
+let rainDrops = []
+
+function setWeather(type) {
+  weather = type
+  
+  if (type === 'rain') {
+    // Add rain particles
+    for (let i = 0; i < 500; i++) {
+      const drop = new THREE.Mesh(
+        new THREE.BoxGeometry(0.02, 0.2, 0.02),
+        new THREE.MeshBasicMaterial({ color: 0xaaaaff, transparent: true, opacity: 0.6 })
+      )
+      drop.position.set(
+        (Math.random() - 0.5) * 100,
+        Math.random() * 50,
+        (Math.random() - 0.5) * 100
+      )
+      scene.add(drop)
+      rainDrops.push(drop)
+    }
+  }
+}
+
+function updateWeather(delta) {
+  if (weather === 'rain') {
+    rainDrops.forEach(drop => {
+      drop.position.y -= 30 * delta
+      if (drop.position.y < 0) drop.position.y = 50
+    })
+  }
+}
