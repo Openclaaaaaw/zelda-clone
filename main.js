@@ -825,3 +825,20 @@ window.addEventListener('resize', () => {
 })
 
 init()
+
+// ==================== CRAFTING (Added) ====================
+const materials = [
+  { name: 'Wood', icon: '🪵' },
+  { name: 'Iron', icon: '⛓️' },
+  { name: 'Gem', icon: '💎' }
+]
+
+const craftRecipes = [
+  { name: 'Sword', need: { Wood: 2, Iron: 3 }, damage: 5 },
+  { name: 'Shield', need: { Wood: 3, Iron: 2 }, defense: 3 },
+  { name: 'Bow', need: { Wood: 4 }, damage: 3 }
+]
+
+function showCrafting() {
+  alert('Crafting coming soon!')
+}
