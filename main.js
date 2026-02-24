@@ -23,7 +23,7 @@ const state = {
 
 // ==================== SCENE SETUP ====================
 const scene = new THREE.Scene()
-scene.background = new THREE.Color(0x87ceeb) // Sky blue
+scene.background = new THREE.Color(0x87ceeb)
 scene.fog = new THREE.Fog(0x87ceeb, 50, 200)
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000)
@@ -52,10 +52,7 @@ scene.add(sunLight)
 
 // ==================== TERRAIN ====================
 function createTerrain() {
-  // Ground
   const groundGeo = new THREE.PlaneGeometry(CONFIG.worldSize, CONFIG.worldSize, 100, 100)
-  
-  // Add some height variation
   const vertices = groundGeo.attributes.position.array
   for (let i = 0; i < vertices.length; i += 3) {
     const x = vertices[i]
@@ -74,7 +71,6 @@ function createTerrain() {
   ground.receiveShadow = true
   scene.add(ground)
   
-  // Add grass patches
   for (let i = 0; i < 500; i++) {
     const x = (Math.random() - 0.5) * CONFIG.worldSize * 0.8
     const z = (Math.random() - 0.5) * CONFIG.worldSize * 0.8
@@ -94,8 +90,6 @@ function createGrass(x, z) {
 // ==================== TREES ====================
 function createTree(x, z, scale = 1) {
   const group = new THREE.Group()
-  
-  // Trunk
   const trunkGeo = new THREE.CylinderGeometry(0.3 * scale, 0.5 * scale, 3 * scale, 8)
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 })
   const trunk = new THREE.Mesh(trunkGeo, trunkMat)
@@ -103,7 +97,6 @@ function createTree(x, z, scale = 1) {
   trunk.castShadow = true
   group.add(trunk)
   
-  // Foliage
   const foliageGeo = new THREE.ConeGeometry(2 * scale, 4 * scale, 8)
   const foliageMat = new THREE.MeshStandardMaterial({ color: 0x228b22 })
   const foliage = new THREE.Mesh(foliageGeo, foliageMat)
@@ -120,7 +113,6 @@ function createBuilding(x, z, type = 'house') {
   const group = new THREE.Group()
   
   if (type === 'house') {
-    // Walls
     const wallsGeo = new THREE.BoxGeometry(4, 3, 4)
     const wallsMat = new THREE.MeshStandardMaterial({ color: 0xd4a574 })
     const walls = new THREE.Mesh(wallsGeo, wallsMat)
@@ -129,7 +121,6 @@ function createBuilding(x, z, type = 'house') {
     walls.receiveShadow = true
     group.add(walls)
     
-    // Roof
     const roofGeo = new THREE.ConeGeometry(3.5, 2, 4)
     const roofMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 })
     const roof = new THREE.Mesh(roofGeo, roofMat)
@@ -137,7 +128,6 @@ function createBuilding(x, z, type = 'house') {
     roof.rotation.y = Math.PI / 4
     group.add(roof)
     
-    // Door
     const doorGeo = new THREE.BoxGeometry(1, 2, 0.1)
     const doorMat = new THREE.MeshStandardMaterial({ color: 0x4a3728 })
     const door = new THREE.Mesh(doorGeo, doorMat)
@@ -151,7 +141,6 @@ function createBuilding(x, z, type = 'house') {
     tower.castShadow = true
     group.add(tower)
     
-    // Top
     const topGeo = new THREE.ConeGeometry(2, 3, 8)
     const topMat = new THREE.MeshStandardMaterial({ color: 0xaa4444 })
     const top = new THREE.Mesh(topGeo, topMat)
@@ -178,33 +167,45 @@ function createLake(x, z, radius = 20) {
   scene.add(lake)
 }
 
+function createMountain(x, z, height) {
+  const mountainGeo = new THREE.ConeGeometry(30, height, 8)
+  const mountainMat = new THREE.MeshStandardMaterial({ color: 0x666666 })
+  const mountain = new THREE.Mesh(mountainGeo, mountainMat)
+  mountain.position.set(x, height / 2, z)
+  mountain.castShadow = true
+  scene.add(mountain)
+  
+  const snowGeo = new THREE.ConeGeometry(10, height * 0.3, 8)
+  const snowMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
+  const snow = new THREE.Mesh(snowGeo, snowMat)
+  snow.position.set(x, height * 0.85, z)
+  scene.add(snow)
+}
+
 // ==================== PLAYER ====================
+let player
 function createPlayer() {
   const group = new THREE.Group()
   
-  // Body
   const bodyGeo = new THREE.CapsuleGeometry(0.4, 1, 4, 8)
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x228b22 }) // Green tunic
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x228b22 })
   const body = new THREE.Mesh(bodyGeo, bodyMat)
   body.position.y = 0.9
   body.castShadow = true
   group.add(body)
   
-  // Head
   const headGeo = new THREE.SphereGeometry(0.3, 16, 16)
-  const headMat = new THREE.MeshStandardMaterial({ color: 0xffdbac }) // Skin
+  const headMat = new THREE.MeshStandardMaterial({ color: 0xffdbac })
   const head = new THREE.Mesh(headGeo, headMat)
   head.position.y = 1.8
   group.add(head)
   
-  // Hat
   const hatGeo = new THREE.ConeGeometry(0.4, 0.3, 16)
   const hatMat = new THREE.MeshStandardMaterial({ color: 0x228b22 })
   const hat = new THREE.Mesh(hatGeo, hatMat)
   hat.position.y = 2.1
   group.add(hat)
   
-  // Sword (on back)
   const swordGeo = new THREE.BoxGeometry(0.05, 0.8, 0.02)
   const swordMat = new THREE.MeshStandardMaterial({ color: 0xc0c0c0 })
   const sword = new THREE.Mesh(swordGeo, swordMat)
@@ -214,15 +215,68 @@ function createPlayer() {
   
   group.position.copy(state.position)
   scene.add(group)
-  
   return group
+}
+
+// ==================== ENEMIES ====================
+const enemies = []
+
+function createEnemy(x, z) {
+  const group = new THREE.Group()
+  const bodyGeo = new THREE.CapsuleGeometry(0.4, 0.8, 4, 8)
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2d5a27 })
+  const body = new THREE.Mesh(bodyGeo, bodyMat)
+  body.position.y = 0.8
+  body.castShadow = true
+  group.add(body)
+  
+  const headGeo = new THREE.SphereGeometry(0.35, 8, 8)
+  const headMat = new THREE.MeshStandardMaterial({ color: 0x4a7c3f })
+  const head = new THREE.Mesh(headGeo, headMat)
+  head.position.y = 1.6
+  group.add(head)
+  
+  const eyeGeo = new THREE.SphereGeometry(0.08, 8, 8)
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000 })
+  const eye1 = new THREE.Mesh(eyeGeo, eyeMat)
+  eye1.position.set(-0.15, 1.65, 0.25)
+  group.add(eye1)
+  const eye2 = new THREE.Mesh(eyeGeo, eyeMat)
+  eye2.position.set(0.15, 1.65, 0.25)
+  group.add(eye2)
+  
+  group.position.set(x, 0, z)
+  group.userData = { type: 'goblin', health: 3, speed: 2 }
+  scene.add(group)
+  enemies.push(group)
+}
+
+// ==================== ITEMS ====================
+const items = []
+
+function createItem(x, z, type = 'rupee') {
+  let geo, color
+  if (type === 'rupee') {
+    geo = new THREE.OctahedronGeometry(0.3)
+    color = 0x00ff00
+  } else if (type === 'heart') {
+    geo = new THREE.DodecahedronGeometry(0.25)
+    color = 0xff0000
+  }
+  
+  const mat = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.5 })
+  const mesh = new THREE.Mesh(geo, mat)
+  mesh.position.set(x, 1, z)
+  mesh.userData = { type }
+  mesh.rotation.y = Math.random() * Math.PI
+  scene.add(mesh)
+  items.push(mesh)
 }
 
 // ==================== WORLD GENERATION ====================
 function generateWorld() {
   createTerrain()
   
-  // Create forests
   for (let i = 0; i < 50; i++) {
     const x = (Math.random() - 0.5) * 200
     const z = (Math.random() - 0.5) * 200
@@ -231,48 +285,39 @@ function generateWorld() {
     }
   }
   
-  // Create buildings
   createBuilding(20, 20, 'house')
   createBuilding(-30, 40, 'house')
   createBuilding(40, -20, 'tower')
   createBuilding(-40, -30, 'house')
   createBuilding(60, 60, 'house')
   
-  // Create lakes
   createLake(-50, 50, 25)
   createLake(80, -60, 15)
   
-  // Create mountains in distance
   for (let i = 0; i < 10; i++) {
     const angle = (i / 10) * Math.PI * 2
     const dist = 150 + Math.random() * 50
-    const x = Math.cos(angle) * dist
-    const z = Math.sin(angle) * dist
-    createMountain(x, z, 20 + Math.random() * 30)
+    createMountain(Math.cos(angle) * dist, Math.sin(angle) * dist, 20 + Math.random() * 30)
   }
-}
-
-function createMountain(x, z, height) {
-  const mountainGeo = new THREE.ConeGeometry(30, height, 8)
-  const mountainMat = new THREE.MeshStandardMaterial({ color: 0x666666 })
-  const mountain = new THREE.Mesh(mountainGeo, mountainMat)
-  mountain.position.set(x, height / 2, z)
-  mountain.castShadow = true
-  scene.add(mountain)
   
-  // Snow cap
-  const snowGeo = new THREE.ConeGeometry(10, height * 0.3, 8)
-  const snowMat = new THREE.MeshStandardMaterial({ color: 0xffffff })
-  const snow = new THREE.Mesh(snowGeo, snowMat)
-  snow.position.set(x, height * 0.85, z)
-  scene.add(snow)
+  // Spawn enemies
+  createEnemy(30, 30)
+  createEnemy(-40, 20)
+  createEnemy(50, -40)
+  
+  // Spawn items
+  for (let i = 0; i < 15; i++) {
+    createItem((Math.random() - 0.5) * 80, (Math.random() - 0.5) * 80, 'rupee')
+  }
+  createItem(25, 25, 'heart')
 }
 
-// ==================== INPUT HANDLING ====================
+// ==================== CONTROLS ====================
 function setupControls() {
   window.addEventListener('keydown', (e) => {
     state.keys[e.key.toLowerCase()] = true
     if (e.key === 'Shift') state.isSprinting = true
+    if (e.key === 'e' || e.key === 'E') attack()
   })
   
   window.addEventListener('keyup', (e) => {
@@ -280,7 +325,6 @@ function setupControls() {
     if (e.key === 'Shift') state.isSprinting = false
   })
   
-  // Pointer lock for mouse look
   renderer.domElement.addEventListener('click', () => {
     renderer.domElement.requestPointerLock()
   })
@@ -294,11 +338,33 @@ function setupControls() {
   })
 }
 
-// ==================== GAME LOOP ====================
-let player
+// ==================== COMBAT ====================
+let attackCooldown = 0
 
+function attack() {
+  if (attackCooldown > 0) return
+  attackCooldown = 0.5
+  
+  enemies.forEach(enemy => {
+    const dist = player.position.distanceTo(enemy.position)
+    if (dist < 3) {
+      enemy.userData.health -= 1
+      const dir = new THREE.Vector3().subVectors(enemy.position, player.position).normalize()
+      enemy.position.add(dir.multiplyScalar(2))
+      
+      if (enemy.userData.health <= 0) {
+        scene.remove(enemy)
+        enemies.splice(enemies.indexOf(enemy), 1)
+      }
+    }
+  })
+}
+
+// ==================== UPDATE ====================
+let gameTime = 0
 function update(delta) {
-  // Movement
+  gameTime += delta
+  
   const speed = state.isSprinting ? CONFIG.sprintSpeed : CONFIG.playerSpeed
   const direction = new THREE.Vector3()
   
@@ -313,7 +379,6 @@ function update(delta) {
     state.position.x += direction.x * speed * delta
     state.position.z += direction.z * speed * delta
     
-    // Sprint stamina drain
     if (state.isSprinting && state.stamina > 0) {
       state.stamina = Math.max(0, state.stamina - 20 * delta)
     } else if (!state.isSprinting) {
@@ -321,41 +386,72 @@ function update(delta) {
     }
   }
   
-  // Jump
   if (state.keys[' '] && !state.isJumping && state.position.y <= 5.1) {
     state.velocity.y = CONFIG.jumpForce
     state.isJumping = true
   }
   
-  // Gravity
   state.velocity.y -= CONFIG.gravity * delta
   state.position.y += state.velocity.y * delta
   
-  // Ground collision
   if (state.position.y < 5) {
     state.position.y = 5
     state.velocity.y = 0
     state.isJumping = false
   }
   
-  // Update player position
   player.position.copy(state.position)
   player.rotation.y = camera.rotation.y
-  
-  // Update camera
   camera.position.copy(state.position)
-  camera.position.y += 1.6 // Eye height
+  camera.position.y += 1.6
   
-  // Update UI
+  // Animate items
+  items.forEach(item => {
+    item.rotation.y += delta
+    item.position.y = 1 + Math.sin(gameTime * 2) * 0.2
+  })
+  
+  // Enemy AI
+  enemies.forEach(enemy => {
+    const dist = enemy.position.distanceTo(player.position)
+    if (dist < 30 && dist > 3) {
+      const dir = new THREE.Vector3().subVectors(player.position, enemy.position).normalize()
+      enemy.position.add(dir.multiplyScalar(enemy.userData.speed * delta))
+      enemy.lookAt(player.position)
+    }
+    if (dist < 2) {
+      if (Math.random() < delta * 2) {
+        state.health -= 1
+        updateUI()
+        if (state.health <= 0) {
+          state.health = 5
+          state.position.set(0, 5, 0)
+        }
+      }
+    }
+  })
+  
+  // Collect items
+  items.forEach((item, index) => {
+    if (player.position.distanceTo(item.position) < 2) {
+      if (item.userData.type === 'rupee') {
+        // collect rupee
+      } else if (item.userData.type === 'heart') {
+        state.health = Math.min(5, state.health + 1)
+      }
+      scene.remove(item)
+      items.splice(index, 1)
+    }
+  })
+  
+  if (attackCooldown > 0) attackCooldown -= delta
+  
   updateUI()
 }
 
 function updateUI() {
-  // Hearts
   const hearts = '❤️'.repeat(state.health) + '🖤'.repeat(5 - state.health)
   document.getElementById('hearts').textContent = hearts
-  
-  // Stamina
   document.getElementById('stamina-bar').style.width = state.stamina + '%'
 }
 
@@ -368,25 +464,18 @@ function animate() {
   renderer.render(scene, camera)
 }
 
-// ==================== INIT ====================
 function init() {
   generateWorld()
   player = createPlayer()
   setupControls()
-  
-  // Hide loading screen
   document.getElementById('loading').classList.add('hidden')
-  
-  // Start game loop
   animate()
 }
 
-// Handle window resize
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight
   camera.updateProjectionMatrix()
   renderer.setSize(window.innerWidth, window.innerHeight)
 })
 
-// Start!
 init()
