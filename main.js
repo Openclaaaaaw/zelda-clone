@@ -6,7 +6,7 @@ const state = {
   health: 5, maxHealth: 5, stamina: 100, rupees: 0, keys: 0,
   isSprinting: false, isJumping: false, isRiding: false,
   velocity: new THREE.Vector3(), keys: {}, position: new THREE.Vector3(0, 5, 0),
-  weather: 'sunny', inventory: [], recipes: [], cooking: null
+  weather: 'sunny', inventory: [], questProgress: {}, completedQuests: []
 }
 
 const scene = new THREE.Scene()
@@ -25,9 +25,132 @@ scene.add(ambientLight)
 const sunLight = new THREE.DirectionalLight(0xfffaed, 1)
 sunLight.position.set(50, 100, 50)
 sunLight.castShadow = true
-sunLight.shadow.mapSize.width = 2048
-sunLight.shadow.mapSize.height = 2048
 scene.add(sunLight)
+
+// ==================== QUESTS ====================
+const quests = [
+  {
+    id: 'tutorial',
+    title: '🔰 Tutorial: Explore',
+    desc: 'Explore the world and find 3 items',
+    type: 'collect',
+    target: 3,
+    reward: 50,
+    progress: 0
+  },
+  {
+    id: 'goblins',
+    title: '⚔️ Defeat Goblins',
+    desc: 'Defeat 3 goblins',
+    type: 'kill',
+    target: 3,
+    reward: 100,
+    progress: 0
+  },
+  {
+    id: 'horse',
+    title: '🐴 Find Your Horse',
+    desc: 'Find and mount a horse',
+    type: 'custom',
+    customCheck: () => state.isRiding,
+    reward: 30,
+    progress: 0
+  },
+  {
+    id: 'cook',
+    title: '🍳 Master Chef',
+    desc: 'Cook any meal',
+    type: 'custom',
+    customCheck: () => state.cookedMeal,
+    reward: 75,
+    progress: 0
+  },
+  {
+    id: 'rich',
+    title: '💰 Wealthy',
+    desc: 'Collect 100 rupees',
+    type: 'rupees',
+    target: 100,
+    reward: 200,
+    progress: 0
+  },
+  {
+    id: 'boss',
+    title: '👹 Defeat Ganon',
+    desc: 'Enter the dungeon and defeat the boss',
+    type: 'boss',
+    target: 1,
+    reward: 500,
+    progress: 0
+  }
+]
+
+function updateQuestProgress(type, amount = 1) {
+  let updated = false
+  
+  quests.forEach(quest => {
+    if (state.completedQuests.includes(quest.id)) return
+    
+    if (quest.type === type || (type === 'collect' && quest.type === 'collect')) {
+      quest.progress = (quest.progress || 0) + amount
+      
+      if (quest.progress >= quest.target) {
+        state.completedQuests.push(quest.id)
+        state.rupees += quest.reward
+        showMessage(`✅ Quest Complete: ${quest.title}! +${quest.reward} rupees`)
+        updated = true
+      }
+    }
+  })
+  
+  if (type === 'kill') {
+    updateQuestProgress('goblins', amount)
+  }
+}
+
+function showQuestLog() {
+  const existing = document.getElementById('quest-log')
+  if (existing) {
+    existing.remove()
+    return
+  }
+  
+  const log = document.createElement('div')
+  log.id = 'quest-log'
+  log.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.95);padding:30px;border-radius:15px;color:white;z-index:300;min-width:400px;max-height:80vh;overflow-y:auto;'
+  
+  let html = '<h2 style="color:#ffd700;margin-bottom:20px;">📜 Quest Log</h2>'
+  
+  quests.forEach(quest => {
+    const completed = state.completedQuests.includes(quest.id)
+    const progress = quest.progress || 0
+    const percent = Math.min(100, (progress / quest.target) * 100)
+    
+    html += `
+      <div style="padding:15px;margin:10px 0;background:${completed ? '#1a4a1a' : '#333'};border-radius:10px;border:2px solid ${completed ? '#4a7' : '#555'};">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:bold;color:${completed ? '#4a7' : '#ffd700'};">${quest.title}</span>
+          <span style="color:#aaa;font-size:12px;">${quest.reward} 💎</span>
+        </div>
+        <p style="color:#aaa;margin:5px 0;font-size:14px;">${quest.desc}</p>
+        ${!completed ? `<div style="background:#222;height:8px;border-radius:4px;margin-top:10px;"><div style="background:#ffd700;height:100%;width:${percent}%;border-radius:4px;"></div></div><p style="color:#888;font-size:12px;margin-top:5px;">${progress}/${quest.target}</p>` : '<p style="color:#4a7;margin-top:10px;">✅ COMPLETED</p>'}
+      </div>
+    `
+  })
+  
+  html += '<button onclick="closeQuestLog()" style="margin-top:20px;padding:10px 30px;background:#ff4444;color:white;border:none;border-radius:5px;cursor:pointer;width:100%;">Close</button>'
+  
+  log.innerHTML = html
+  document.body.appendChild(log)
+}
+
+window.closeQuestLog = function() {
+  const log = document.getElementById('quest-log')
+  if (log) log.remove()
+}
+
+// Make showQuestLog global
+window.showQuestLog = showQuestLog
 
 function createTerrain() {
   const ground = new THREE.Mesh(
@@ -105,13 +228,6 @@ function createMountain(x, z, h) {
   )
   mtn.position.set(x, h / 2, z)
   scene.add(mtn)
-  
-  const snow = new THREE.Mesh(
-    new THREE.ConeGeometry(10, h * 0.3, 8),
-    new THREE.MeshStandardMaterial({ color: 0xffffff })
-  )
-  snow.position.set(x, h * 0.85, z)
-  scene.add(snow)
 }
 
 function createDungeon(x, z) {
@@ -128,14 +244,12 @@ function createDungeon(x, z) {
     new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0xffaa00, emissiveIntensity: 1 })
   )
   glow.position.set(x, 6, z)
+  glow.name = 'dungeonGlow'
   scene.add(glow)
 }
 
-// ==================== COOKING POT ====================
 function createCookingPot(x, z) {
   const group = new THREE.Group()
-  
-  // Pot
   const pot = new THREE.Mesh(
     new THREE.CylinderGeometry(0.8, 0.6, 1, 16),
     new THREE.MeshStandardMaterial({ color: 0x333333 })
@@ -143,13 +257,11 @@ function createCookingPot(x, z) {
   pot.position.y = 0.5
   group.add(pot)
   
-  // Fire
   const fire = new THREE.Mesh(
     new THREE.ConeGeometry(0.5, 0.8, 8),
     new THREE.MeshStandardMaterial({ color: 0xff4400, emissive: 0xff4400, emissiveIntensity: 1 })
   )
   fire.position.y = 0.2
-  fire.name = 'fire'
   group.add(fire)
   
   group.position.set(x, 0, z)
@@ -161,7 +273,6 @@ function createCookingPot(x, z) {
 let player, horse = null
 function createPlayer() {
   const group = new THREE.Group()
-  
   const body = new THREE.Mesh(
     new THREE.CapsuleGeometry(0.4, 1, 4, 8),
     new THREE.MeshStandardMaterial({ color: 0x228b22 })
@@ -208,30 +319,12 @@ function createHorse(x, z, color = 0x8B4513) {
   body.castShadow = true
   group.add(body)
   
-  const neck = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.2, 0.3, 1, 8),
-    new THREE.MeshStandardMaterial({ color })
-  )
-  neck.position.set(0, 2, 1)
-  neck.rotation.x = -0.3
-  group.add(neck)
-  
   const head = new THREE.Mesh(
     new THREE.BoxGeometry(0.4, 0.5, 0.8),
     new THREE.MeshStandardMaterial({ color })
   )
   head.position.set(0, 2.3, 1.3)
   group.add(head)
-  
-  for (let i = 0; i < 4; i++) {
-    const leg = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.1, 0.1, 1.2, 8),
-      new THREE.MeshStandardMaterial({ color })
-    )
-    leg.position.set((i % 2 === 0 ? 0.3 : -0.3), 0.6, (i < 2 ? 0.5 : -0.5))
-    leg.name = `leg${i}`
-    group.add(leg)
-  }
   
   group.position.set(x, 0, z)
   group.userData = { type: 'horse', speed: CONFIG.horseSpeed }
@@ -249,6 +342,7 @@ function createGoblin(x, z) {
   )
   body.position.y = 0.8
   group.add(body)
+  
   const head = new THREE.Mesh(
     new THREE.SphereGeometry(0.35, 8, 8),
     new THREE.MeshStandardMaterial({ color: 0x4a7c3f })
@@ -293,9 +387,7 @@ function createBoss(x, z) {
   enemies.push(group)
 }
 
-// ==================== INGREDIENTS ====================
 const items = []
-
 const ingredients = [
   { name: 'Apple', color: 0xff0000, heal: 2 },
   { name: 'Mushroom', color: 0xcc9966, heal: 1 },
@@ -349,7 +441,6 @@ function createKey(x, z) {
   items.push(key)
 }
 
-// ==================== RECIPES ====================
 const recipes = [
   { name: 'Soup', ingredients: ['Mushroom', 'Herb'], heal: 5 },
   { name: 'Stew', ingredients: ['Meat', 'Mushroom', 'Herb'], heal: 10 },
@@ -357,76 +448,6 @@ const recipes = [
   { name: 'Power Food', ingredients: ['Apple', 'Meat'], heal: 15 },
   { name: 'Full Restore', ingredients: ['Apple', 'Meat', 'Fish', 'Herb', 'Mushroom'], heal: 25 }
 ]
-
-function canCook() {
-  scene.traverse(obj => {
-    if (obj.userData?.type === 'cookingPot') {
-      const dist = player.position.distanceTo(obj.position)
-      if (dist < 3) return true
-    }
-  })
-  return false
-}
-
-function showCookingUI() {
-  if (!canCook()) {
-    showMessage('Find a cooking pot!')
-    return
-  }
-  
-  const ui = document.createElement('div')
-  ui.id = 'cooking-ui'
-  ui.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);padding:30px;border-radius:15px;color:white;z-index:300;min-width:300px;'
-  
-  ui.innerHTML = `
-    <h2 style="color:#ffd700;margin-bottom:20px;">🍳 Cooking</h2>
-    <div style="margin-bottom:15px;">
-      <strong>Inventory:</strong>
-      <div id="inventory-list" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:10px;">
-        ${state.inventory.map(i => `<span style="background:#444;padding:5px 10px;border-radius:5px;">${i}</span>`).join('') || 'Empty'}
-      </div>
-    </div>
-    <div>
-      <strong>Recipes:</strong>
-      <div id="recipe-list" style="margin-top:10px;">
-        ${recipes.map((r, i) => `
-          <div onclick="cookRecipe(${i})" style="padding:10px;margin:5px 0;background:#333;cursor:pointer;border-radius:5px;display:flex;justify-content:space-between;">
-            <span>${r.name}</span>
-            <span style="color:#888;">${r.heal} ❤️</span>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-    <button onclick="closeCooking()" style="margin-top:20px;padding:10px 30px;background:#ff4444;color:white;border:none;border-radius:5px;cursor:pointer;">Close</button>
-  `
-  document.body.appendChild(ui)
-}
-
-function closeCooking() {
-  const ui = document.getElementById('cooking-ui')
-  if (ui) ui.remove()
-}
-
-// Make functions global
-window.cookRecipe = function(idx) {
-  const recipe = recipes[idx]
-  const hasAll = recipe.ingredients.every(i => state.inventory.includes(i))
-  
-  if (hasAll) {
-    recipe.ingredients.forEach(i => {
-      const idx = state.inventory.indexOf(i)
-      if (idx > -1) state.inventory.splice(idx, 1)
-    })
-    
-    state.health = Math.min(state.maxHealth, state.health + recipe.heal)
-    showMessage(`Cooked ${recipe.name}! +${recipe.heal} ❤️`)
-    closeCooking()
-  } else {
-    showMessage('Missing ingredients!')
-  }
-}
-
-window.closeCooking = closeCooking
 
 function generateWorld() {
   createTerrain()
@@ -452,8 +473,6 @@ function generateWorld() {
   }
   
   createDungeon(-80, -80)
-  
-  // Cooking pot
   createCookingPot(25, -25)
   
   createHorse(10, 10, 0x8B4513)
@@ -466,7 +485,6 @@ function generateWorld() {
   
   createBoss(-80, -80)
   
-  // Ingredients
   for (let i = 0; i < 15; i++) {
     createIngredient((Math.random() - 0.5) * 80, (Math.random() - 0.5) * 80, Math.floor(Math.random() * ingredients.length))
   }
@@ -478,7 +496,6 @@ function generateWorld() {
   createKey(0, 50)
 }
 
-// ==================== WEATHER ====================
 let weatherParticles = []
 let currentWeather = 'sunny'
 
@@ -531,7 +548,6 @@ function updateWeather(delta) {
       if (p.position.y < 0) p.position.y = 60
     } else if (currentWeather === 'snow') {
       p.position.y -= 5 * delta
-      p.position.x += Math.sin(p.position.y) * delta
       if (p.position.y < 0) p.position.y = 60
     }
   })
@@ -544,7 +560,6 @@ function cycleWeather() {
   showMessage(`Weather: ${currentWeather}`)
 }
 
-// ==================== CONTROLS ====================
 function setupControls() {
   window.addEventListener('keydown', (e) => {
     state.keys[e.key.toLowerCase()] = true
@@ -554,7 +569,7 @@ function setupControls() {
       else tryMountHorse()
     }
     if (e.key === 't' || e.key === 'T') cycleWeather()
-    if (e.key === 'c' || e.key === 'C') showCookingUI()
+    if (e.key === 'q' || e.key === 'Q') showQuestLog()
     if (e.key === 's' || e.key === 'S') saveGame()
   })
   
@@ -574,40 +589,6 @@ function setupControls() {
   })
 }
 
-// ==================== SAVE SYSTEM ====================
-function saveGame() {
-  const saveData = {
-    position: state.position,
-    health: state.health,
-    maxHealth: state.maxHealth,
-    rupees: state.rupees,
-    keys: state.keys,
-    inventory: state.inventory,
-    weather: currentWeather
-  }
-  
-  localStorage.setItem('zelda_save', JSON.stringify(saveData))
-  showMessage('Game Saved! 💾')
-}
-
-function loadGame() {
-  const saved = localStorage.getItem('zelda_save')
-  if (saved) {
-    const data = JSON.parse(saved)
-    state.position = new THREE.Vector3(data.position.x, data.position.y, data.position.z)
-    state.health = data.health
-    state.maxHealth = data.maxHealth
-    state.rupees = data.rupees
-    state.keys = data.keys
-    state.inventory = data.inventory || []
-    if (data.weather) setWeather(data.weather)
-    showMessage('Game Loaded! 📂')
-    return true
-  }
-  return false
-}
-
-// ==================== HORSE ====================
 function tryMountHorse() {
   let closestHorse = null
   let closestDist = 5
@@ -626,7 +607,8 @@ function tryMountHorse() {
     horse = closestHorse
     state.isRiding = true
     player.visible = false
-    showMessage('Mounted Horse! (E to dismount)')
+    showMessage('Mounted Horse!')
+    updateQuestProgress('horse')
   }
 }
 
@@ -642,7 +624,6 @@ function dismountHorse() {
   }
 }
 
-// ==================== COMBAT ====================
 let attackCooldown = 0
 
 function attack() {
@@ -656,18 +637,17 @@ function attack() {
       enemy.userData.health -= 1
       const dir = new THREE.Vector3().subVectors(enemy.position, player.position).normalize()
       enemy.position.add(dir.multiplyScalar(state.isRiding ? 5 : 3))
-      showDamage(enemy.position, '-1')
       
       if (enemy.userData.health <= 0) {
         scene.remove(enemy)
         enemies.splice(enemies.indexOf(enemy), 1)
         showMessage(`Defeated ${enemy.userData.name}!`)
+        updateQuestProgress('kill')
       }
     }
   })
 }
 
-// ==================== UI ====================
 function showMessage(text) {
   const msg = document.createElement('div')
   msg.style.cssText = 'position:fixed;top:40%;left:50%;transform:translate(-50%,-50%);color:#ffd700;font-size:32px;font-weight:bold;text-shadow:2px 2px 4px #000;z-index:200;animation:fadeOut 1.5s forwards;'
@@ -676,20 +656,43 @@ function showMessage(text) {
   setTimeout(() => msg.remove(), 1500)
 }
 
-function showDamage(pos, text) {
-  const msg = document.createElement('div')
-  msg.style.cssText = 'position:fixed;top:30%;left:50%;transform:translate(-50%,-50%);color:#ff4444;font-size:24px;font-weight:bold;z-index:200;'
-  msg.textContent = text
-  document.body.appendChild(msg)
-  setTimeout(() => msg.remove(), 500)
-}
-
 function updateUI() {
   document.getElementById('hearts').textContent = '❤️'.repeat(state.health) + '🖤'.repeat(state.maxHealth - state.health)
   document.getElementById('stamina-bar').style.width = state.stamina + '%'
 }
 
-// ==================== GAME LOOP ====================
+function saveGame() {
+  const saveData = {
+    position: state.position,
+    health: state.health,
+    maxHealth: state.maxHealth,
+    rupees: state.rupees,
+    keys: state.keys,
+    inventory: state.inventory,
+    weather: currentWeather,
+    completedQuests: state.completedQuests
+  }
+  localStorage.setItem('zelda_save', JSON.stringify(saveData))
+  showMessage('Game Saved! 💾')
+}
+
+function loadGame() {
+  const saved = localStorage.getItem('zelda_save')
+  if (saved) {
+    const data = JSON.parse(saved)
+    state.position = new THREE.Vector3(data.position.x, data.position.y, data.position.z)
+    state.health = data.health
+    state.maxHealth = data.maxHealth
+    state.rupees = data.rupees
+    state.keys = data.keys
+    state.inventory = data.inventory || []
+    state.completedQuests = data.completedQuests || []
+    if (data.weather) setWeather(data.weather)
+    return true
+  }
+  return false
+}
+
 let gameTime = 0
 function update(delta) {
   gameTime += delta
@@ -711,12 +714,6 @@ function update(delta) {
       horse.position.x += direction.x * speed * delta
       horse.position.z += direction.z * speed * delta
       horse.rotation.y = camera.rotation.y
-      
-      horse.children.forEach((child, i) => {
-        if (child.name?.startsWith('leg')) {
-          child.rotation.x = Math.sin(gameTime * 10) * 0.5
-        }
-      })
     }
     
     state.position.x += direction.x * speed * delta
@@ -761,11 +758,9 @@ function update(delta) {
     if (dist < 30 && dist > 2) {
       const dir = new THREE.Vector3().subVectors(player.position, enemy.position).normalize()
       enemy.position.add(dir.multiplyScalar(enemy.userData.speed * delta))
-      enemy.lookAt?.(player.position)
     }
     if (dist < 2 && Math.random() < delta * 2) {
       state.health -= enemy.userData.damage
-      showDamage(player.position, `-${enemy.userData.damage}`)
       if (state.health <= 0) {
         state.health = state.maxHealth
         state.position.set(0, 5, 0)
@@ -779,6 +774,7 @@ function update(delta) {
     if (player.position.distanceTo(item.position) < 2) {
       if (item.userData.type === 'rupee') {
         state.rupees += item.userData.value
+        updateQuestProgress('rupees', item.userData.value)
       } else if (item.userData.type === 'heart') {
         state.maxHealth = Math.min(10, state.maxHealth + 1)
         state.health = state.maxHealth
@@ -787,9 +783,8 @@ function update(delta) {
       } else if (item.userData.type === 'ingredient') {
         if (state.inventory.length < 10) {
           state.inventory.push(item.userData.name)
+          updateQuestProgress('collect')
           showMessage(`+${item.userData.name}`)
-        } else {
-          showMessage('Inventory full!')
         }
       }
       scene.remove(item)
@@ -816,7 +811,7 @@ function init() {
   setupControls()
   
   if (!loadGame()) {
-    showMessage('Welcome! WASD move, E ride, T weather, C cook, S save!')
+    showMessage('Welcome! Press Q for quests!')
   }
   
   document.getElementById('loading').classList.add('hidden')
@@ -830,119 +825,3 @@ window.addEventListener('resize', () => {
 })
 
 init()
-
-// ==================== FULL MAP ====================
-function showFullMap() {
-  const existing = document.getElementById('full-map')
-  if (existing) {
-    existing.remove()
-    return
-  }
-  
-  const map = document.createElement('div')
-  map.id = 'full-map'
-  map.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,50,0,0.95);z-index:500;display:flex;align-items:center;justify-content:center;'
-  
-  // Map canvas
-  const canvas = document.createElement('canvas')
-  canvas.width = 600
-  canvas.height = 600
-  canvas.style.cssText = 'border:3px solid #4a7c3f;border-radius:10px;'
-  
-  const ctx = canvas.getContext('2d')
-  
-  // Draw terrain
-  ctx.fillStyle = '#4a7c3f'
-  ctx.fillRect(0, 0, 600, 600)
-  
-  // Draw lakes
-  ctx.fillStyle = '#1e90ff'
-  ctx.beginPath()
-  ctx.arc(150, 350, 40, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.beginPath()
-  ctx.arc(450, 350, 30, 0, Math.PI * 2)
-  ctx.fill()
-  
-  // Draw dungeon
-  ctx.fillStyle = '#444444'
-  ctx.fillRect(80, 80, 30, 30)
-  ctx.fillStyle = '#ffaa00'
-  ctx.beginPath()
-  ctx.arc(95, 70, 10, 0, Math.PI * 2)
-  ctx.fill()
-  
-  // Draw player
-  ctx.fillStyle = '#00ff00'
-  ctx.beginPath()
-  ctx.arc(300 + state.position.x / 2, 300 + state.position.z / 2, 8, 0, Math.PI * 2)
-  ctx.fill()
-  ctx.strokeStyle = '#ffffff'
-  ctx.lineWidth = 2
-  ctx.stroke()
-  
-  // Draw enemies
-  ctx.fillStyle = '#ff0000'
-  enemies.forEach(e => {
-    ctx.beginPath()
-    ctx.arc(300 + e.position.x / 2, 300 + e.position.z / 2, 5, 0, Math.PI * 2)
-    ctx.fill()
-  })
-  
-  // Draw horses
-  ctx.fillStyle = '#8B4513'
-  scene.traverse(obj => {
-    if (obj.userData?.type === 'horse') {
-      ctx.beginPath()
-      ctx.arc(300 + obj.position.x / 2, 300 + obj.position.z / 2, 5, 0, Math.PI * 2)
-      ctx.fill()
-    }
-  })
-  
-  // Draw cooking pot
-  ctx.fillStyle = '#333333'
-  ctx.beginPath()
-  ctx.arc(300 + 25 / 2, 300 - 25 / 2, 8, 0, Math.PI * 2)
-  ctx.fill()
-  
-  // Labels
-  ctx.fillStyle = '#ffffff'
-  ctx.font = '12px Arial'
-  ctx.fillText('🏰 Dungeon', 70, 60)
-  ctx.fillText('🍳 Cooking', 280, 270)
-  ctx.fillText('💧 Lake', 130, 320)
-  ctx.fillText('💧 Lake', 430, 320)
-  
-  // Compass
-  ctx.fillStyle = '#ffd700'
-  ctx.font = 'bold 20px Arial'
-  ctx.fillText('N', 290, 20)
-  
-  map.appendChild(canvas)
-  
-  // Close button
-  const close = document.createElement('button')
-  close.textContent = 'Close (M)'
-  close.style.cssText = 'position:absolute;top:20px;right:20px;padding:10px 20px;background:#ff4444;color:white;border:none;border-radius:5px;cursor:pointer;font-size:16px;'
-  close.onclick = () => map.remove()
-  map.appendChild(close)
-  
-  // Instructions
-  const info = document.createElement('div')
-  info.style.cssText = 'position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#aaa;font-size:14px;'
-  info.textContent = '🟢 Player | 🔴 Enemies | 🟤 Horses | 🏰 Dungeon | 🍳 Cooking'
-  map.appendChild(info)
-  
-  document.body.appendChild(map)
-}
-
-// Update controls to add M for map
-const originalSetup = setupControls
-setupControls = function() {
-  originalSetup()
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'm' || e.key === 'M') {
-      showFullMap()
-    }
-  })
-}
