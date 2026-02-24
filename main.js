@@ -6,7 +6,7 @@ const state = {
   health: 5, maxHealth: 5, stamina: 100, rupees: 0, keys: 0,
   isSprinting: false, isJumping: false, isRiding: false,
   velocity: new THREE.Vector3(), keys: {}, position: new THREE.Vector3(0, 5, 0),
-  weather: 'sunny'
+  weather: 'sunny', inventory: [], recipes: [], cooking: null
 }
 
 const scene = new THREE.Scene()
@@ -131,6 +131,33 @@ function createDungeon(x, z) {
   scene.add(glow)
 }
 
+// ==================== COOKING POT ====================
+function createCookingPot(x, z) {
+  const group = new THREE.Group()
+  
+  // Pot
+  const pot = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.8, 0.6, 1, 16),
+    new THREE.MeshStandardMaterial({ color: 0x333333 })
+  )
+  pot.position.y = 0.5
+  group.add(pot)
+  
+  // Fire
+  const fire = new THREE.Mesh(
+    new THREE.ConeGeometry(0.5, 0.8, 8),
+    new THREE.MeshStandardMaterial({ color: 0xff4400, emissive: 0xff4400, emissiveIntensity: 1 })
+  )
+  fire.position.y = 0.2
+  fire.name = 'fire'
+  group.add(fire)
+  
+  group.position.set(x, 0, z)
+  group.userData = { type: 'cookingPot' }
+  scene.add(group)
+  return group
+}
+
 let player, horse = null
 function createPlayer() {
   const group = new THREE.Group()
@@ -170,11 +197,8 @@ function createPlayer() {
   return group
 }
 
-// ==================== HORSES ====================
 function createHorse(x, z, color = 0x8B4513) {
   const group = new THREE.Group()
-  
-  // Body
   const body = new THREE.Mesh(
     new THREE.CapsuleGeometry(0.6, 1.8, 4, 8),
     new THREE.MeshStandardMaterial({ color })
@@ -184,7 +208,6 @@ function createHorse(x, z, color = 0x8B4513) {
   body.castShadow = true
   group.add(body)
   
-  // Neck
   const neck = new THREE.Mesh(
     new THREE.CylinderGeometry(0.2, 0.3, 1, 8),
     new THREE.MeshStandardMaterial({ color })
@@ -193,7 +216,6 @@ function createHorse(x, z, color = 0x8B4513) {
   neck.rotation.x = -0.3
   group.add(neck)
   
-  // Head
   const head = new THREE.Mesh(
     new THREE.BoxGeometry(0.4, 0.5, 0.8),
     new THREE.MeshStandardMaterial({ color })
@@ -201,16 +223,6 @@ function createHorse(x, z, color = 0x8B4513) {
   head.position.set(0, 2.3, 1.3)
   group.add(head)
   
-  // Mane
-  const mane = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.15, 0.15, 1.2, 8),
-    new THREE.MeshStandardMaterial({ color: 0x222222 })
-  )
-  mane.position.set(0, 2.1, 0.7)
-  mane.rotation.x = 0.2
-  group.add(mane)
-  
-  // Legs
   for (let i = 0; i < 4; i++) {
     const leg = new THREE.Mesh(
       new THREE.CylinderGeometry(0.1, 0.1, 1.2, 8),
@@ -221,17 +233,8 @@ function createHorse(x, z, color = 0x8B4513) {
     group.add(leg)
   }
   
-  // Tail
-  const tail = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.05, 0.1, 0.8, 8),
-    new THREE.MeshStandardMaterial({ color: 0x222222 })
-  )
-  tail.position.set(0, 1.5, -1.2)
-  tail.rotation.x = 0.5
-  group.add(tail)
-  
   group.position.set(x, 0, z)
-  group.userData = { type: 'horse', speed: CONFIG.horseSpeed, name: 'Horse' }
+  group.userData = { type: 'horse', speed: CONFIG.horseSpeed }
   scene.add(group)
   return group
 }
@@ -290,7 +293,28 @@ function createBoss(x, z) {
   enemies.push(group)
 }
 
+// ==================== INGREDIENTS ====================
 const items = []
+
+const ingredients = [
+  { name: 'Apple', color: 0xff0000, heal: 2 },
+  { name: 'Mushroom', color: 0xcc9966, heal: 1 },
+  { name: 'Fish', color: 0x6699cc, heal: 3 },
+  { name: 'Meat', color: 0x993333, heal: 4 },
+  { name: 'Herb', color: 0x66cc66, heal: 2 }
+]
+
+function createIngredient(x, z, type) {
+  const ing = ingredients[type]
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.2, 8, 8),
+    new THREE.MeshStandardMaterial({ color: ing.color, emissive: ing.color, emissiveIntensity: 0.3 })
+  )
+  mesh.position.set(x, 1, z)
+  mesh.userData = { type: 'ingredient', name: ing.name, heal: ing.heal }
+  scene.add(mesh)
+  items.push(mesh)
+}
 
 function createRupee(x, z) {
   const rupee = new THREE.Mesh(
@@ -325,6 +349,85 @@ function createKey(x, z) {
   items.push(key)
 }
 
+// ==================== RECIPES ====================
+const recipes = [
+  { name: 'Soup', ingredients: ['Mushroom', 'Herb'], heal: 5 },
+  { name: 'Stew', ingredients: ['Meat', 'Mushroom', 'Herb'], heal: 10 },
+  { name: 'Fish Stew', ingredients: ['Fish', 'Herb'], heal: 8 },
+  { name: 'Power Food', ingredients: ['Apple', 'Meat'], heal: 15 },
+  { name: 'Full Restore', ingredients: ['Apple', 'Meat', 'Fish', 'Herb', 'Mushroom'], heal: 25 }
+]
+
+function canCook() {
+  scene.traverse(obj => {
+    if (obj.userData?.type === 'cookingPot') {
+      const dist = player.position.distanceTo(obj.position)
+      if (dist < 3) return true
+    }
+  })
+  return false
+}
+
+function showCookingUI() {
+  if (!canCook()) {
+    showMessage('Find a cooking pot!')
+    return
+  }
+  
+  const ui = document.createElement('div')
+  ui.id = 'cooking-ui'
+  ui.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.9);padding:30px;border-radius:15px;color:white;z-index:300;min-width:300px;'
+  
+  ui.innerHTML = `
+    <h2 style="color:#ffd700;margin-bottom:20px;">🍳 Cooking</h2>
+    <div style="margin-bottom:15px;">
+      <strong>Inventory:</strong>
+      <div id="inventory-list" style="display:flex;gap:5px;flex-wrap:wrap;margin-top:10px;">
+        ${state.inventory.map(i => `<span style="background:#444;padding:5px 10px;border-radius:5px;">${i}</span>`).join('') || 'Empty'}
+      </div>
+    </div>
+    <div>
+      <strong>Recipes:</strong>
+      <div id="recipe-list" style="margin-top:10px;">
+        ${recipes.map((r, i) => `
+          <div onclick="cookRecipe(${i})" style="padding:10px;margin:5px 0;background:#333;cursor:pointer;border-radius:5px;display:flex;justify-content:space-between;">
+            <span>${r.name}</span>
+            <span style="color:#888;">${r.heal} ❤️</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <button onclick="closeCooking()" style="margin-top:20px;padding:10px 30px;background:#ff4444;color:white;border:none;border-radius:5px;cursor:pointer;">Close</button>
+  `
+  document.body.appendChild(ui)
+}
+
+function closeCooking() {
+  const ui = document.getElementById('cooking-ui')
+  if (ui) ui.remove()
+}
+
+// Make functions global
+window.cookRecipe = function(idx) {
+  const recipe = recipes[idx]
+  const hasAll = recipe.ingredients.every(i => state.inventory.includes(i))
+  
+  if (hasAll) {
+    recipe.ingredients.forEach(i => {
+      const idx = state.inventory.indexOf(i)
+      if (idx > -1) state.inventory.splice(idx, 1)
+    })
+    
+    state.health = Math.min(state.maxHealth, state.health + recipe.heal)
+    showMessage(`Cooked ${recipe.name}! +${recipe.heal} ❤️`)
+    closeCooking()
+  } else {
+    showMessage('Missing ingredients!')
+  }
+}
+
+window.closeCooking = closeCooking
+
 function generateWorld() {
   createTerrain()
   
@@ -350,16 +453,23 @@ function generateWorld() {
   
   createDungeon(-80, -80)
   
-  // Horses!
-  createHorse(10, 10, 0x8B4513)  // Brown
-  createHorse(15, 15, 0xFFFFFF)   // White
-  createHorse(-10, 20, 0x222222)  // Black
+  // Cooking pot
+  createCookingPot(25, -25)
+  
+  createHorse(10, 10, 0x8B4513)
+  createHorse(15, 15, 0xFFFFFF)
+  createHorse(-10, 20, 0x222222)
   
   createGoblin(30, 30)
   createGoblin(-40, 20)
   createGoblin(50, -40)
   
   createBoss(-80, -80)
+  
+  // Ingredients
+  for (let i = 0; i < 15; i++) {
+    createIngredient((Math.random() - 0.5) * 80, (Math.random() - 0.5) * 80, Math.floor(Math.random() * ingredients.length))
+  }
   
   for (let i = 0; i < 20; i++) {
     createRupee((Math.random() - 0.5) * 100, (Math.random() - 0.5) * 100)
@@ -444,6 +554,8 @@ function setupControls() {
       else tryMountHorse()
     }
     if (e.key === 't' || e.key === 'T') cycleWeather()
+    if (e.key === 'c' || e.key === 'C') showCookingUI()
+    if (e.key === 's' || e.key === 'S') saveGame()
   })
   
   window.addEventListener('keyup', (e) => {
@@ -462,12 +574,44 @@ function setupControls() {
   })
 }
 
-// ==================== HORSE RIDING ====================
+// ==================== SAVE SYSTEM ====================
+function saveGame() {
+  const saveData = {
+    position: state.position,
+    health: state.health,
+    maxHealth: state.maxHealth,
+    rupees: state.rupees,
+    keys: state.keys,
+    inventory: state.inventory,
+    weather: currentWeather
+  }
+  
+  localStorage.setItem('zelda_save', JSON.stringify(saveData))
+  showMessage('Game Saved! 💾')
+}
+
+function loadGame() {
+  const saved = localStorage.getItem('zelda_save')
+  if (saved) {
+    const data = JSON.parse(saved)
+    state.position = new THREE.Vector3(data.position.x, data.position.y, data.position.z)
+    state.health = data.health
+    state.maxHealth = data.maxHealth
+    state.rupees = data.rupees
+    state.keys = data.keys
+    state.inventory = data.inventory || []
+    if (data.weather) setWeather(data.weather)
+    showMessage('Game Loaded! 📂')
+    return true
+  }
+  return false
+}
+
+// ==================== HORSE ====================
 function tryMountHorse() {
   let closestHorse = null
   let closestDist = 5
   
-  // Find horses in scene
   scene.traverse(obj => {
     if (obj.userData?.type === 'horse') {
       const dist = player.position.distanceTo(obj.position)
@@ -568,7 +712,6 @@ function update(delta) {
       horse.position.z += direction.z * speed * delta
       horse.rotation.y = camera.rotation.y
       
-      // Animate legs
       horse.children.forEach((child, i) => {
         if (child.name?.startsWith('leg')) {
           child.rotation.x = Math.sin(gameTime * 10) * 0.5
@@ -634,10 +777,21 @@ function update(delta) {
   
   items.forEach((item, index) => {
     if (player.position.distanceTo(item.position) < 2) {
-      if (item.userData.type === 'rupee') state.rupees += item.userData.value
-      else if (item.userData.type === 'heart') { state.maxHealth = Math.min(10, state.maxHealth + 1); state.health = state.maxHealth }
-      else if (item.userData.type === 'key') state.keys++
-      showMessage(`+${item.userData.type}`)
+      if (item.userData.type === 'rupee') {
+        state.rupees += item.userData.value
+      } else if (item.userData.type === 'heart') {
+        state.maxHealth = Math.min(10, state.maxHealth + 1)
+        state.health = state.maxHealth
+      } else if (item.userData.type === 'key') {
+        state.keys++
+      } else if (item.userData.type === 'ingredient') {
+        if (state.inventory.length < 10) {
+          state.inventory.push(item.userData.name)
+          showMessage(`+${item.userData.name}`)
+        } else {
+          showMessage('Inventory full!')
+        }
+      }
       scene.remove(item)
       items.splice(index, 1)
     }
@@ -660,8 +814,12 @@ function init() {
   generateWorld()
   player = createPlayer()
   setupControls()
+  
+  if (!loadGame()) {
+    showMessage('Welcome! WASD move, E ride, T weather, C cook, S save!')
+  }
+  
   document.getElementById('loading').classList.add('hidden')
-  showMessage('Find horses! Press E to mount!')
   animate()
 }
 
